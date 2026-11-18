@@ -41,7 +41,12 @@ jobs:
       - name: Build Original Tracker, Tracker+, and Tracker Mini firmware
         run: |
           set -o pipefail
-          make all 2>&1 | tee build_output.log
+          POSTFIX_ARGS=""
+          if [[ "${{ github.ref }}" != refs/tags/v* ]]; then
+            SHORT_SHA=$(git rev-parse --short=7 HEAD)
+            POSTFIX_ARGS="ORIGINAL_POSTFIX=CE_${SHORT_SHA} PLUS_POSTFIX=CE_${SHORT_SHA} MINI_POSTFIX=CE_${SHORT_SHA}"
+          fi
+          make all $POSTFIX_ARGS 2>&1 | tee build_output.log
 
       - name: Build reference .ptfx Sample Editor plugins
         run: |
