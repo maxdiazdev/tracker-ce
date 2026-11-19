@@ -268,7 +268,9 @@ class cPatternEditor : public ModuleBase
     char cPattern[5];
     char cLength[5];
     char cStep[5];
-    char cTitlePattern[PATTERN_NAME_LENGTH + 1];
+    // Pattern title: name (or its cut-down form ending in "...") + view suffix.
+    char cTitlePattern[PATTERN_NAME_LENGTH + sizeof("...") - 1 + sizeof(" N:mV")];
+    bool titleShowsMicVolView = false; // view suffix the title was last drawn with
 
     bool refreshAfterReleaseFx;
 

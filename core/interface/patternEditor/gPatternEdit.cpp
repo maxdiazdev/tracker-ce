@@ -1647,25 +1647,60 @@ void cPatternEditor::showTitleBarPattern()
     char* patternName =
       newFileManager.getPatternsMetadata()->getPatternName(mtProject.values.actualPattern);
 
+    char name[PATTERN_NAME_LENGTH + 1];
+
     if (patternName == nullptr || patternName[0] == 0)
     {
-        snprintf(cTitlePattern,
-                 sizeof(cTitlePattern),
+        snprintf(name,
+                 sizeof(name),
                  mtConfig.general.numberingMode == NumberingMode::kHexadecimal ? "Pattern %02X"
                                                                                : "Pattern %d",
                  mtProject.values.actualPattern);
     }
     else
     {
-        snprintf(cTitlePattern, sizeof(cTitlePattern), "%s", patternName);
+        snprintf(name, sizeof(name), "%s", patternName);
     }
 
     if (sequencer.isPerformancePatternChanged())
     {
-        strncpy(cTitlePattern, "Pattern PERF", 13);
-        cTitlePattern[13] = 0;
+        snprintf(name, sizeof(name), "%s", "Pattern PERF");
     }
 
+    // The view suffix must always stay visible. Room for the wider suffix is
+    // reserved (so the name does not change length when the view is toggled),
+    // and a name too wide for the rest is cut and marked with "...".
+    static constexpr const char* kSuffixFx = " N:fx";
+    static constexpr const char* kSuffixMicVol = " N:mV";
+    static constexpr const char* kCutMarker = "...";
+
+    const strFont* font = titleBar->getTitleFont();
+    const uint16_t suffixFxWidth = getTextWidth(font, kSuffixFx, strlen(kSuffixFx));
+    const uint16_t suffixMicVolWidth = getTextWidth(font, kSuffixMicVol, strlen(kSuffixMicVol));
+    const uint16_t suffixWidth =
+      suffixFxWidth > suffixMicVolWidth ? suffixFxWidth : suffixMicVolWidth;
+    const uint16_t nameWidthLimit = TitleBar::kTitleWidth - suffixWidth;
+
+    const char* suffix = isMicVolView ? kSuffixMicVol : kSuffixFx;
+
+    if (getTextWidth(font, name, strlen(name)) <= nameWidthLimit)
+    {
+        snprintf(cTitlePattern, sizeof(cTitlePattern), "%s%s", name, suffix);
+    }
+    else
+    {
+        const uint16_t cutWidthLimit =
+          nameWidthLimit - getTextWidth(font, kCutMarker, strlen(kCutMarker));
+        int keep = getMaxTextLengthThatFitSpecificWidth(font, name, cutWidthLimit);
+        while (keep > 0 && name[keep - 1] == ' ')
+        {
+            keep--; // no space before "..."
+        }
+        snprintf(
+          cTitlePattern, sizeof(cTitlePattern), "%.*s%s%s", keep, name, kCutMarker, suffix);
+    }
+
+    titleShowsMicVolView = isMicVolView;
     titleBar->setTitle(cTitlePattern);
 }
 
