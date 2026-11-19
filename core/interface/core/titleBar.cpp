@@ -31,9 +31,9 @@ void TitleBar::initControls()
     strControlProperties prop;
     prop.x = 9;
     prop.y = 13;
-    prop.w = 270;
+    prop.w = kTitleWidth;
     prop.colors = display.getTheme().topBarLabelColors;
-    prop.style = (controlStyleCenterY | controlStyleFont4 | controlStyleLimitTextWidth);
+    prop.style = kTitleStyle;
     titleLabel = display.createControl<cLabel>(&prop);
 
     prop.y = 13;
@@ -119,6 +119,12 @@ void TitleBar::show(bool showRightLabel)
     display.refreshControl(bar);
 
     visible = true;
+}
+
+const strFont* TitleBar::getTitleFont() const
+{
+    const uint32_t style = kTitleStyle; // read by FONT_INDEX_FROM_STYLE
+    return &fonts[FONT_INDEX_FROM_STYLE];
 }
 
 void TitleBar::setTitle(const char* text)

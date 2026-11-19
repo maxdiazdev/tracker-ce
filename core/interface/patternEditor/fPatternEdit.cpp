@@ -500,6 +500,12 @@ void cPatternEditor::refreshPattern()
     trackerPattern.patternLength = seq->track[0].length + 1;
     trackerPattern.selectedParam = editParam;
 
+    // The view is toggled in several places; keep the title's view suffix in step.
+    if (titleShowsMicVolView != isMicVolView)
+    {
+        showTitleBarPattern();
+    }
+
     //----------------------------------------------------------------------------
     // disable part of the pattern when needed
 

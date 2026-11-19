@@ -19,6 +19,10 @@ class TitleBar
     void hide();
 
     void setTitle(const char* text);
+
+    // Width and font of the title label, for code that fits text into the title.
+    static constexpr uint16_t kTitleWidth = 270;
+    const strFont* getTitleFont() const;
     void setRightLabel(const char* text);
     void showCurrentInstrumentOnRightLabel();
     void setBatteryValue(int valuePercent, bool charging);
@@ -31,6 +35,9 @@ class TitleBar
     friend Interface;
 
   private:
+    static constexpr uint32_t kTitleStyle =
+      controlStyleCenterY | controlStyleFont4 | controlStyleLimitTextWidth;
+
     static constexpr int kPerformance1Treshold = 85;
     static constexpr int kPerformance2Treshold = 93;
     static constexpr int kPerformance3Treshold = 99;
