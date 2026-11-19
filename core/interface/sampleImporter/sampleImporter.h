@@ -350,6 +350,10 @@ class cSampleImporter : public ModuleBase
     const char* firstLineReplaceInfoPopup =
       firstLineDeletePopupOptions[oneInstrumentInfoPupupFirstLineText];
 
+    const char* secondLineReplaceInfoPopup = nullptr; // nullptr: "Do you want to continue?"
+    char replaceInfoLine1[56];
+    char replaceInfoLine2[56];
+
     uint8_t replaceSource = 0;
 
     bool addNextOperationWantReplaceInstrument;

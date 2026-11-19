@@ -30,6 +30,8 @@ static void functMenu(uint8_t state);
 static void functPlayAction();
 
 static void functEnter();
+static void functEnterFolder();
+static void functInsert();
 static void functRename();
 static void functDeleteUnused();
 static void functShift(uint8_t state);
@@ -349,7 +351,7 @@ void cSampleImporter::setDefaultScreenFunct()
 
     ip->setButtonObj(interfaceButtonShift, functShift);
 
-    ip->setButtonObj(interfaceButtonInsert, buttonPress, functEnter);
+    ip->setButtonObj(interfaceButtonInsert, buttonPress, functInsert);
 
     ip->setButtonObj(interfaceButtonCopy, buttonPress, functCopyPaste);
     //	ip->setButtonObj(interfaceButtonPaste, buttonPress, functPaste);
@@ -357,7 +359,7 @@ void cSampleImporter::setDefaultScreenFunct()
     // ip->setButtonObj(interfaceButton0, buttonPress, functChangeFolder);
     // ip->setButtonObj(interfaceButton1, buttonPress, functChangeFolder);
 
-    ip->setButtonObj(interfaceButton0, buttonPress, functEnter);
+    ip->setButtonObj(interfaceButton0, buttonPress, functEnterFolder); // Add is on button 2
     ip->setButtonObj(interfaceButton1, buttonPress, functInstrumentAddNext); // 3
     commonPreviewButton = interfaceButton2;
     ip->setButtonObj(commonPreviewButton, functPreviewFile);      // 4
@@ -414,16 +416,28 @@ static void instrumentAdd(bool addNext)
     if (instrToReplaceCount > 0)
     {
         SI->replaceSource = 0;
+
+        // Name the samples: the file going in --> the first sample it replaces (+ how many more)
+        uint8_t firstFilled = replaceStart;
+        while (!mtProject.instrument[firstFilled].isActive)
+            firstFilled++;
+        const uint8_t incomingFile = SI->getSelectionStart(listFiles) + (firstFilled - replaceStart);
+
+        snprintf(SI->replaceInfoLine1, sizeof(SI->replaceInfoLine1), "Replace? %s -->",
+                 SI->explorerNames[incomingFile]);
         if (instrToReplaceCount > 1)
-            SI->firstLineReplaceInfoPopup =
-              SI->firstLineReplacePopupOptions
-                [cSampleImporter::moreThanOneInstrumentInfoPupupFirstLineText];
+            snprintf(SI->replaceInfoLine2, sizeof(SI->replaceInfoLine2), "%d. %s (+%d more)",
+                     firstFilled + 1, mtProject.instrument[firstFilled].sample.file_name,
+                     instrToReplaceCount - 1);
         else
-            SI->firstLineReplaceInfoPopup =
-              SI->firstLineReplacePopupOptions
-                [cSampleImporter::oneInstrumentInfoPupupFirstLineText];
+            snprintf(SI->replaceInfoLine2, sizeof(SI->replaceInfoLine2), "%d. %s",
+                     firstFilled + 1, mtProject.instrument[firstFilled].sample.file_name);
+
+        SI->firstLineReplaceInfoPopup = SI->replaceInfoLine1;
+        SI->secondLineReplaceInfoPopup = SI->replaceInfoLine2;
         SI->setReplaceInstrumentHandlerFunctions();
         SI->showInfoPopupReplaceInstrument();
+        SI->secondLineReplaceInfoPopup = nullptr; // other replace prompts keep the stock text
         SI->addNextOperationWantReplaceInstrument = addNext;
     }
     else
@@ -885,6 +899,24 @@ static void functEnter()
     {
         case 0: SI->BrowseOrAdd(); break;
         case 1: SI->BrowseOrAdd(); break;
+    }
+}
+
+// Insert: Add, only while the instrument list has focus; nothing otherwise
+static void functInsert()
+{
+    if (SI->selectedPlace == 1)
+    {
+        functInstrumentAddNext();
+    }
+}
+
+// Button 1: opens the highlighted folder; does nothing (greyed out) on a file
+static void functEnterFolder()
+{
+    if (SI->explorerNames != nullptr && *SI->explorerNames[SI->selectedFile] == '/')
+    {
+        SI->BrowseOrAdd();
     }
 }
 
@@ -2018,21 +2050,26 @@ static void functPads(uint8_t pad, uint8_t state, int16_t velo)
         //			else padsBacklight.setFrontLayer(0,0,pad);
         //		}
 
-        // Pad n plays slot n, as the Pattern editor's Instrument column does: at C-4, with
-        // the instrument's settings, while held; the release starts the Amp envelope's
-        // release. The slot is also highlighted, so it becomes the target of Add.
+        // Pad n highlights slot n (the target of Add) and lights while held, so the light is
+        // tied to the highlight moving. A filled slot also plays, as in the Pattern editor's
+        // Instrument column: at C-4, with the instrument's settings, while held; the release
+        // starts the Amp envelope's release.
         if (state == buttonPress)
         {
-            if (pad >= kSampleInstrumentsCount || !mtProject.instrument[pad].isActive ||
-                SI->currentCopyStatusFlag || SI->currentLoadStatusFlag)
+            if (pad >= kSampleInstrumentsCount || SI->currentCopyStatusFlag ||
+                SI->currentLoadStatusFlag)
             {
                 return;
             }
 
             padsBacklight.setFrontLayer(1, mtConfig.values.padsLightFront, pad);
             SI->selectSlotFromPad(pad);
-            sequencer.handleNoteOn(
-              Sequencer::GRID_OUTSIDE_PATTERN, Sequencer::STEP_NOTE_DEFAULT, -1, pad);
+
+            if (mtProject.instrument[pad].isActive)
+            {
+                sequencer.handleNoteOn(
+                  Sequencer::GRID_OUTSIDE_PATTERN, Sequencer::STEP_NOTE_DEFAULT, -1, pad);
+            }
         }
         else if (state == buttonRelease)
         {
