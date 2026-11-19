@@ -171,6 +171,15 @@ class cSampleImporter : public ModuleBase
     uint8_t currentLoadStatusFlag = 0;
 
     //--------------------------------------------------------------
+    // Pads: pad n plays slot n, as in the Pattern editor's Instrument column. Pads of
+    // filled slots are lit.
+    void selectSlotFromPad(uint8_t slot); // highlight it and make it the current instrument
+    void refreshPadSlotLights();
+    void clearPadSlotLights();
+    bool padSlotLightsShown = false;
+    uint64_t padSlotLightsMask = 0;
+
+    //--------------------------------------------------------------
     // odsluch
     void playSelectedSdFile(uint16_t from, uint16_t to);
     void playSampleFromBank(uint8_t pad, uint8_t state, int16_t velo);

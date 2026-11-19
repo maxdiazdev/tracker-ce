@@ -235,11 +235,14 @@ void cSampleImporter::update()
         refreshActionButtons();
         display.synchronizeRefresh();
     }
+
+    refreshPadSlotLights();
 }
 
 void cSampleImporter::start(uint32_t options)
 {
     moduleRefresh = 1;
+    padSlotLightsShown = false; // drawn by the next update()
 
     if (mtProject.values.lastUsedInstrument >= kSampleInstrumentsCount)
     {
@@ -321,6 +324,9 @@ void cSampleImporter::stop()
     mtPopups.hideInfoPopup();
 
     stopPlayingAll();
+    sequencer.stopManualNotes();            // a pad may still be held while leaving
+    clearPadSlotLights();
+    padsBacklight.clearGlobalPads(1, 0, 0); // the held pad's light
 
     moduleRefresh = 0;
 }
@@ -950,6 +956,7 @@ static void functConfirmRename()
             newFileManager.setInstrumentStructChanged(mtProject.values.lastUsedInstrument);
 
             SI->keyboardManager.deactivateKeyboard();
+            SI->padSlotLightsShown = false; // hiding the keyboard turns some pad LEDs off directly
         }
     }
 }
@@ -2010,7 +2017,85 @@ static void functPads(uint8_t pad, uint8_t state, int16_t velo)
         //			if(state) padsBacklight.setFrontLayer(1,mtConfig.values.padsLightFront, pad);
         //			else padsBacklight.setFrontLayer(0,0,pad);
         //		}
+
+        // Pad n plays slot n, as the Pattern editor's Instrument column does: at C-4, with
+        // the instrument's settings, while held; the release starts the Amp envelope's
+        // release. The slot is also highlighted, so it becomes the target of Add.
+        if (state == buttonPress)
+        {
+            if (pad >= kSampleInstrumentsCount || !mtProject.instrument[pad].isActive ||
+                SI->currentCopyStatusFlag || SI->currentLoadStatusFlag)
+            {
+                return;
+            }
+
+            padsBacklight.setFrontLayer(1, mtConfig.values.padsLightFront, pad);
+            SI->selectSlotFromPad(pad);
+            sequencer.handleNoteOn(
+              Sequencer::GRID_OUTSIDE_PATTERN, Sequencer::STEP_NOTE_DEFAULT, -1, pad);
+        }
+        else if (state == buttonRelease)
+        {
+            padsBacklight.setFrontLayer(0, 0, pad);
+            sequencer.handleNoteOff(
+              Sequencer::GRID_OUTSIDE_PATTERN, Sequencer::STEP_NOTE_DEFAULT, 0, pad);
+        }
     }
+}
+
+void cSampleImporter::selectSlotFromPad(uint8_t slot)
+{
+    // As scrolling the slot list to it (without a selection range)
+    selectedSlot = slot;
+    memset(&selectionTab[listInstruments][0], 0, maxListLength);
+    selectionLength[listInstruments] = 0;
+
+    mtProject.values.lastUsedInstrument = selectedSlot;
+
+    display.setControlValue(instrumentListControl, selectedSlot);
+    display.refreshControl(instrumentListControl);
+
+    refreshGuiAfterDelay();
+}
+
+void cSampleImporter::refreshPadSlotLights()
+{
+    // The rename keyboard uses the pads; keep them free of slot lights meanwhile
+    if (keyboardManager.getState())
+    {
+        clearPadSlotLights();
+        return;
+    }
+
+    uint64_t mask = 0;
+    for (uint8_t slot = 0; slot < kSampleInstrumentsCount; slot++)
+    {
+        if (mtProject.instrument[slot].isActive)
+        {
+            mask |= (uint64_t)1 << slot;
+        }
+    }
+
+    if (padSlotLightsShown && mask == padSlotLightsMask)
+        return;
+
+    for (uint8_t slot = 0; slot < kSampleInstrumentsCount; slot++)
+    {
+        const bool filled = (mask >> slot) & 1;
+        padsBacklight.setBackLayer(filled, filled ? mtConfig.values.padsLightBack : 0, slot);
+    }
+
+    padSlotLightsMask = mask;
+    padSlotLightsShown = true;
+}
+
+void cSampleImporter::clearPadSlotLights()
+{
+    if (!padSlotLightsShown)
+        return;
+
+    padsBacklight.clearGlobalPads(0, 1, 0); // back layer only; the keyboard uses the front
+    padSlotLightsShown = false;
 }
 
 static void functStopPatternYes()

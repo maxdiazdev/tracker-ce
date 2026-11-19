@@ -156,7 +156,7 @@ void cSampleImporter::showDefaultScreen()
     display.setControlText(label[4], "Import"); // Preview
     display.setControlText(label[5], "Delete");
     display.setControlText2(label[5], "unused");
-    display.setControlText(label[6], "Preview Vol");
+    display.setControlText(label[6], "SD Card Vol");
     display.setControlText2(label[6], "");
 
     display.setControlText(label[7], "Memory");
@@ -204,6 +204,7 @@ void cSampleImporter::showDefaultScreen()
     display.refreshControl(instrumentLabelControl);
 
     keyboardManager.deactivateKeyboard();
+    padSlotLightsShown = false; // hiding the keyboard turns some pad LEDs off directly
 
     display.setControlShow(previewVolumeBarControl);
     display.refreshControl(previewVolumeBarControl);

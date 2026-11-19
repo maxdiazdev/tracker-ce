@@ -4224,6 +4224,21 @@ void cPatternEditor::lightUpPadBoard()
 
     //--------------------------------------------
 
+    // Instrument column on a sample track: pad n plays slot n, so every pad with a sound in
+    // its slot is lit (MIDI tracks pick MIDI instruments with the pads and stay as before)
+    if (editParam == EditInstr && !isSelectionOrCursorInMidiTracks())
+    {
+        for (uint8_t slot = 0; slot < kSampleInstrumentsCount; slot++)
+        {
+            if (mtProject.instrument[slot].isActive)
+            {
+                padsBacklight.setBackLayer(1, mtConfig.values.padsLightBack, slot);
+            }
+        }
+    }
+
+    //--------------------------------------------
+
     if (editMode > 0)
     {
         Sequencer::strPattern* seq = sequencer.getPatternToUI();
