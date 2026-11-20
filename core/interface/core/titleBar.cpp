@@ -265,6 +265,20 @@ void TitleBar::refresh()
     Profiler::AudioProcessorUsage usage;
     Profiler::getInstance()->getAudioProcessingUsagePercent(usage, true);
 
+    // TEMP (CPU feasibility build): live audio CPU readout on the right of the title bar.
+    // now = peak of the last 300 ms, avg = running average, pk = peak since power-on.
+    {
+        static int cpuPeak = 0;
+        static char cpuText[40];
+        if (usage.tempMaximum > cpuPeak)
+            cpuPeak = usage.tempMaximum;
+        snprintf(cpuText, sizeof(cpuText), "CPU %d%% avg %d%% pk %d%%", usage.tempMaximum,
+                 usage.average, cpuPeak);
+        display.setControlText(rightLabel, cpuText);
+        display.setControlShow(rightLabel);
+        display.refreshControl(rightLabel);
+    }
+
     bool showBox = false;
     uint32_t boxColor = 0;
 
