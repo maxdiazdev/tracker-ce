@@ -150,7 +150,7 @@ void cSampleImporter::showDefaultScreen()
     titleBar->setTitle("Sample Loader");
 
     display.setControlText(label[0], ""); // Micro SD
-    display.setControlText(label[1], "Add next");
+    display.setControlText(label[1], "Add");
     display.setControlText(label[2], "Preview");
     display.setControlText(label[3], "Rename");
     display.setControlText(label[4], "Import"); // Preview
@@ -477,23 +477,16 @@ void cSampleImporter::showRename()
 
 void cSampleImporter::showAddOrEnter()
 {
-    if (explorerNames != nullptr && *explorerNames[selectedFile] == '/')
-    {
-        display.setControlText(label[0], "Enter");
+    // Button 1 only opens folders; Add is on button 2
+    display.setControlText(label[0], "Enter");
 
-        if (selectedPlace == 0)
-        {
-            display.setControlColors(label[0], display.getTheme().activeButtonLabelsColors);
-        }
-        else
-        {
-            display.setControlColors(label[0], display.getTheme().inactiveButtonLabelsColors);
-        }
+    if (explorerNames != nullptr && *explorerNames[selectedFile] == '/' && selectedPlace == 0)
+    {
+        display.setControlColors(label[0], display.getTheme().activeButtonLabelsColors);
     }
     else
     {
-        display.setControlText(label[0], "Add");
-        display.setControlColors(label[0], display.getTheme().activeButtonLabelsColors);
+        display.setControlColors(label[0], display.getTheme().inactiveButtonLabelsColors);
     }
 
     display.refreshControl(label[0]);
@@ -501,6 +494,26 @@ void cSampleImporter::showAddOrEnter()
 
 void cSampleImporter::addNextColorControl()
 {
+    // "Add" for one file, "Add / selected" (two lines) when several files are selected; not
+    // while the rename keyboard uses this label
+    if (keyboardManager.getState())
+    {
+    }
+    else if (getSelectionEnd(listFiles) > getSelectionStart(listFiles))
+    {
+        display.setControlText(label[1], "Add");
+        display.setControlText2(label[1], "selected");
+        display.setControlValue(label[1], 1);
+        display.setControlStyle2(label[1],
+                                 controlStyleCenterX | controlStyleCenterY | controlStyleFont3);
+    }
+    else
+    {
+        display.setControlText(label[1], "Add");
+        display.setControlText2(label[1], "");
+        display.setControlValue(label[1], 0);
+    }
+
     if (explorerNames != nullptr && *explorerNames[selectedFile] != '/')
     {
         display.setControlColors(label[1], display.getTheme().activeButtonLabelsColors);
@@ -751,7 +764,9 @@ void cSampleImporter::showInfoPopupDeleteInstrument()
 
 void cSampleImporter::showInfoPopupReplaceInstrument()
 {
-    mtPopups.showInfoPopup(firstLineReplaceInfoPopup, "Do you want to continue?");
+    mtPopups.showInfoPopup(firstLineReplaceInfoPopup,
+                           secondLineReplaceInfoPopup ? secondLineReplaceInfoPopup
+                                                      : "Do you want to continue?");
 
     for (uint8_t i = 0; i < 8; i++)
     {
