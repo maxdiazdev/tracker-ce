@@ -23,8 +23,14 @@ class TitleBar
     // Width and font of the title label, for code that fits text into the title.
     static constexpr uint16_t kTitleWidth = 270;
     const strFont* getTitleFont() const;
+    // Text too wide for widthLimit is cut and ends in kCutMarker. Returns how many characters of
+    // text to keep: strlen(text) when it fits, else the length before the marker (no space left
+    // before it).
+    static constexpr const char* kCutMarker = "...";
+    static uint16_t lengthBeforeCut(const strFont* font, const char* text, uint16_t widthLimit);
     void setRightLabel(const char* text);
-    void showCurrentInstrumentOnRightLabel();
+    // picked: the current instrument is the one the user picked, shown with a "-> " prefix
+    void showCurrentInstrumentOnRightLabel(bool picked = false);
     void setBatteryValue(int valuePercent, bool charging);
 
     void showRightLabel(bool show);

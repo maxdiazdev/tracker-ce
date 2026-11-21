@@ -1672,7 +1672,6 @@ void cPatternEditor::showTitleBarPattern()
     // and a name too wide for the rest is cut and marked with "...".
     static constexpr const char* kSuffixFx = " N:fx";
     static constexpr const char* kSuffixMicVol = " N:mV";
-    static constexpr const char* kCutMarker = "...";
 
     const strFont* font = titleBar->getTitleFont();
     const uint16_t suffixFxWidth = getTextWidth(font, kSuffixFx, strlen(kSuffixFx));
@@ -1683,22 +1682,14 @@ void cPatternEditor::showTitleBarPattern()
 
     const char* suffix = isMicVolView ? kSuffixMicVol : kSuffixFx;
 
-    if (getTextWidth(font, name, strlen(name)) <= nameWidthLimit)
-    {
-        snprintf(cTitlePattern, sizeof(cTitlePattern), "%s%s", name, suffix);
-    }
-    else
-    {
-        const uint16_t cutWidthLimit =
-          nameWidthLimit - getTextWidth(font, kCutMarker, strlen(kCutMarker));
-        int keep = getMaxTextLengthThatFitSpecificWidth(font, name, cutWidthLimit);
-        while (keep > 0 && name[keep - 1] == ' ')
-        {
-            keep--; // no space before "..."
-        }
-        snprintf(
-          cTitlePattern, sizeof(cTitlePattern), "%.*s%s%s", keep, name, kCutMarker, suffix);
-    }
+    const int keep = TitleBar::lengthBeforeCut(font, name, nameWidthLimit);
+    snprintf(cTitlePattern,
+             sizeof(cTitlePattern),
+             "%.*s%s%s",
+             keep,
+             name,
+             name[keep] != 0 ? TitleBar::kCutMarker : "",
+             suffix);
 
     titleShowsMicVolView = isMicVolView;
     titleBar->setTitle(cTitlePattern);
@@ -1716,18 +1707,20 @@ void cPatternEditor::showActualParamOnBar(bool forceShow)
         case cPatternEditor::EditNote:
         case cPatternEditor::EditInstr:
         {
-            uint8_t idx = mtProject.values.lastUsedInstrument;
-
-            if (lastTitleBarParamValue == idx && lastTitleBarParam <= cPatternEditor::EditInstr &&
-                !forceShow)
+            // The current instrument, marked "->" when it is the picked one (not lent by the
+            // note under the cursor)
+            const uint8_t shownValue =
+              mtProject.values.lastUsedInstrument + (currentIsPicked ? kTitleBarPicked : 0);
+            if (lastTitleBarParamValue == shownValue &&
+                lastTitleBarParam <= cPatternEditor::EditInstr && !forceShow)
             {
                 return;
             }
 
-            lastTitleBarParamValue = idx;
+            lastTitleBarParamValue = shownValue;
             lastTitleBarParam = editParam;
 
-            titleBar->showCurrentInstrumentOnRightLabel();
+            titleBar->showCurrentInstrumentOnRightLabel(currentIsPicked);
             return;
         }
         case cPatternEditor::EditFx1:

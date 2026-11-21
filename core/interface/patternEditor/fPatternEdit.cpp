@@ -170,6 +170,17 @@ elapsedMillis playheadBlinkTimer;
 
 void cPatternEditor::update()
 {
+    // Not under a popup: the picker lights the pads and changes the current instrument itself
+    if (mtPopups.getStepPopupState() == stepPopupNone)
+    {
+        followCursorInstrument();
+        if (editParam <= EditInstr)
+            showActualParamOnBar(); // title bar instrument follows pads and the grid
+        if (editParam == EditInstr &&
+            padsLitCurrentInstrument != mtProject.values.lastUsedInstrument)
+            lightUpPadBoard(); // the bright pad follows the current instrument
+    }
+
     // zarzadznie renderowaniem zaznaczenia ---------------------------
     uint8_t managerStatus = newFileManager.getStatus();
 
@@ -359,7 +370,9 @@ void cPatternEditor::stop()
         mtPopups.toggleNoteKeyboardPopup();
     }
 
-    refreshLastUsedInstrument();
+    // Leaving copies the note under the cursor into the default note, as stock. The current
+    // instrument is left as followCursorInstrument() set it.
+    refreshLastUsedNote();
 
     undoRedoOpen = 0; // na wszelki
 
@@ -4180,6 +4193,7 @@ void cPatternEditor::loadPatternsStatus()
 void cPatternEditor::lightUpPadBoard()
 {
     padsBacklight.clearGlobalPads(1, 1, 0);
+    padsLitCurrentInstrument = mtProject.values.lastUsedInstrument;
 
     //--------------------------------------------
 
@@ -4228,13 +4242,7 @@ void cPatternEditor::lightUpPadBoard()
     // its slot is lit (MIDI tracks pick MIDI instruments with the pads and stay as before)
     if (editParam == EditInstr && !isSelectionOrCursorInMidiTracks())
     {
-        for (uint8_t slot = 0; slot < kSampleInstrumentsCount; slot++)
-        {
-            if (mtProject.instrument[slot].isActive)
-            {
-                padsBacklight.setBackLayer(1, mtConfig.values.padsLightBack, slot);
-            }
-        }
+        lightUpFilledSamplePads();
     }
 
     //--------------------------------------------
@@ -4433,6 +4441,55 @@ void cPatternEditor::lightUpPadBoard()
 
                     break;
             }
+        }
+    }
+
+    // Instrument column on a sample track: the current instrument's pad is lit as bright as a
+    // pressed pad
+    if (editParam == EditInstr && !isSelectionOrCursorInMidiTracks())
+    {
+        const uint8_t current = mtProject.values.lastUsedInstrument;
+        if (current < kSampleInstrumentsCount)
+        {
+            padsBacklight.setBackLayer(1, mtConfig.values.padsLightFront, current);
+        }
+    }
+}
+
+void cPatternEditor::followCursorInstrument()
+{
+    uint8_t& current = mtProject.values.lastUsedInstrument;
+    const Sequencer::strPattern::strTrack::strStep& step =
+      sequencer.getPatternToUI()->track[trackerPattern.actualTrack].step[trackerPattern.actualStep];
+#if GUI_HANDLE_SYNTH
+    constexpr int kMaxInstruments =
+      kSampleInstrumentsCount + kMidiInstrumentsCount + kSynthInstrumentsCount - 1;
+#else
+    constexpr int kMaxInstruments = kSampleInstrumentsCount + kMidiInstrumentsCount - 1;
+#endif
+    const bool onNote = step.note >= 0;
+    const uint8_t noteInstrument = onNote ? clamp<int>(step.instrument, 0, kMaxInstruments) : 0xFF;
+
+    // Changed by something else (the picker, another screen, a project load): a new pick. Not
+    // when it is the note's own instrument: editing a note copies its instrument into the
+    // current one, which is not a pick.
+    if (followedInstrument == 0xFF || (current != followedInstrument && current != noteInstrument))
+    {
+        pickedInstrument = current;
+    }
+
+    currentIsPicked = !onNote || sequencer.isPlay();
+    current = currentIsPicked ? pickedInstrument : noteInstrument;
+    followedInstrument = current;
+}
+
+void cPatternEditor::lightUpFilledSamplePads()
+{
+    for (uint8_t slot = 0; slot < kSampleInstrumentsCount; slot++)
+    {
+        if (mtProject.instrument[slot].isActive)
+        {
+            padsBacklight.setBackLayer(1, mtConfig.values.padsLightBack, slot);
         }
     }
 }
@@ -4653,6 +4710,7 @@ static void functPads(uint8_t pad, uint8_t state, int16_t velo)
         if (PTE->editParam == cPatternEditor::EditInstr)
         {
             mtProject.values.lastUsedInstrument = pad;
+            PTE->pickedInstrument = pad; // a pad press picks, even on a note with this instrument
             noteToPlay = sequencer.getSelectionFirstNote();
         }
 
@@ -4772,6 +4830,7 @@ static void functPads(uint8_t pad, uint8_t state, int16_t velo)
                             ? MIDI_INSTRUMENTS_START_IDX + (pad % kMidiInstrumentsCount)
                             : pad;
                         sequencer.setSelectionInstrument(instrumentToSet);
+                        PTE->pickedInstrument = mtProject.values.lastUsedInstrument; // a pick
                     }
                 }
                 break;
@@ -5093,7 +5152,7 @@ void cPatternEditor::changePatternViewMode(uint8_t param)
     display.refreshControl(PTE->patternControl);
 }
 
-void cPatternEditor::refreshLastUsedInstrument()
+void cPatternEditor::refreshLastUsedNote()
 {
     Sequencer::strPattern* seq = sequencer.getPatternToUI();
     Sequencer::strPattern::strTrack::strStep* actualStep =
@@ -5102,15 +5161,6 @@ void cPatternEditor::refreshLastUsedInstrument()
     if (actualStep->note >= 0)
     {
         mtProject.values.lastUsedNote = actualStep->note;
-
-#if GUI_HANDLE_SYNTH
-        int kMaxInstruments =
-          kSampleInstrumentsCount + kMidiInstrumentsCount + kSynthInstrumentsCount - 1;
-#else
-        int kMaxInstruments = kSampleInstrumentsCount + kMidiInstrumentsCount - 1;
-#endif
-        mtProject.values.lastUsedInstrument =
-          clamp<int>(actualStep->instrument, 0, kMaxInstruments);
     }
 }
 

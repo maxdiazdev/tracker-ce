@@ -31,7 +31,7 @@ class cPatternEditor : public ModuleBase
 
     virtual void hideControlsUnderMiniMenu();
 
-    void refreshLastUsedInstrument();
+    void refreshLastUsedNote();
 
     cPatternEditor();
     virtual ~cPatternEditor() {}
@@ -94,6 +94,7 @@ class cPatternEditor : public ModuleBase
 
     void loadPatternsStatus();
     void lightUpPadBoard();
+    static void lightUpFilledSamplePads(); // every pad whose sample slot has audio
     void clearPadBoard();
 
     void showMuteButtons(uint8_t state, bool midiTracks);
@@ -371,6 +372,14 @@ class cPatternEditor : public ModuleBase
     void hideActualParamOnBar();
 
     uint8_t lastTitleBarParamValue = 0xFF;
+    static constexpr uint8_t kTitleBarPicked = 0x80; // added to the cached value: "->" shown
+    uint8_t padsLitCurrentInstrument = 0xFF; // current instrument when the pads were last lit
+    // The note under the cursor lends its instrument to the current instrument; elsewhere (and
+    // during playback) the current instrument is the last one picked
+    void followCursorInstrument();
+    uint8_t pickedInstrument = 0;      // the last instrument picked (pads, picker, other screens)
+    uint8_t followedInstrument = 0xFF; // the current instrument as last set here, 0xFF: not yet
+    bool currentIsPicked = true;       // false while the current instrument is a note's
     uint8_t lastTitleBarFx = 0xFF;
     uint8_t lastTitleBarParam = 0xFF;
     char rightTitleBarLabel[40];

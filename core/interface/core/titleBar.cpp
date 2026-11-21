@@ -2,6 +2,8 @@
 #include "core/interfaceDefs.h"
 #include "display.h"
 
+#include <cstring>
+
 #if GUI_HANDLE_SYNTH
 #include "Profiler.h"
 #include "Synth.h"
@@ -14,6 +16,16 @@ static elapsedMillis refreshTimer;
 #ifdef TRACKER_MINI
 #define BATTERY_ENABLED 1
 #endif
+
+#ifdef BATTERY_ENABLED
+static constexpr int16_t kRightLabelX = 790 - 28; // right edge, left of the battery
+#else
+static constexpr int16_t kRightLabelX = 790; // right edge
+#endif
+static constexpr uint32_t kRightLabelStyle =
+  controlStyleRightX | controlStyleCenterY | controlStyleFont4;
+// the right label is cut with "..." where it would reach the title area (plus a 10 px gap)
+static constexpr uint16_t kRightLabelWidth = kRightLabelX - (9 + TitleBar::kTitleWidth) - 10;
 
 void TitleBar::init(Synth* synth, [[maybe_unused]] Battery* battery)
 {
@@ -37,13 +49,9 @@ void TitleBar::initControls()
     titleLabel = display.createControl<cLabel>(&prop);
 
     prop.y = 13;
-#ifdef BATTERY_ENABLED
-    prop.x = 790 - 28;
-#else
-    prop.x = 790;
-#endif
+    prop.x = kRightLabelX;
     prop.colors = display.getTheme().topBarLabelColors;
-    prop.style = (controlStyleRightX | controlStyleCenterY | controlStyleFont4);
+    prop.style = kRightLabelStyle;
     rightLabel = display.createControl<cLabel>(&prop);
 
 #ifdef BATTERY_ENABLED
@@ -139,10 +147,31 @@ void TitleBar::setRightLabel(const char* text)
     display.refreshControl(rightLabel);
 }
 
-void TitleBar::showCurrentInstrumentOnRightLabel()
+uint16_t TitleBar::lengthBeforeCut(const strFont* font, const char* text, uint16_t widthLimit)
 {
-    static char actualInstrName[SAMPLE_NAME_SIZE + 1];
-    actualInstrName[0] = 0;
+    const uint16_t length = strlen(text);
+    if (getTextWidth(font, text, length) <= widthLimit)
+    {
+        return length;
+    }
+
+    int keep = getMaxTextLengthThatFitSpecificWidth(
+      font, text, widthLimit - getTextWidth(font, kCutMarker, strlen(kCutMarker)));
+    while (keep > 0 && text[keep - 1] == ' ')
+    {
+        keep--; // no space before "..."
+    }
+    return keep;
+}
+
+void TitleBar::showCurrentInstrumentOnRightLabel(bool picked)
+{
+    // "-> " marks the picked instrument; a name too wide for the label is cut and marked "..."
+    static constexpr const char* kPickedMarker = "-> ";
+    // "-> " + "48. " + a full sample name, with room for "..."
+    static char shownName[SAMPLE_NAME_SIZE + 16];
+    shownName[0] = 0;
+    const char* prefix = picked ? kPickedMarker : "";
 
     uint8_t idx = mtProject.values.lastUsedInstrument;
 
@@ -151,41 +180,42 @@ void TitleBar::showCurrentInstrumentOnRightLabel()
 #if GUI_HANDLE_SYNTH
         assert(synth);
         assert((idx - SYNTH_INSTRUMENTS_START_IDX) < kSynthInstrumentsCount);
-        strncpy(actualInstrName,
-                synth->getSynthName((idx - SYNTH_INSTRUMENTS_START_IDX)).c_str(),
-                SAMPLE_NAME_SIZE);
-        actualInstrName[SAMPLE_NAME_SIZE] = 0;
+        snprintf(shownName,
+                 sizeof(shownName),
+                 "%s%s",
+                 prefix,
+                 synth->getSynthName((idx - SYNTH_INSTRUMENTS_START_IDX)).c_str());
 #endif
     }
     else if (idx >= MIDI_INSTRUMENTS_START_IDX)
     {
-        snprintf(actualInstrName,
-                 SAMPLE_NAME_SIZE,
-                 "%d. MIDI Channel %d",
+        snprintf(shownName,
+                 sizeof(shownName),
+                 "%s%d. MIDI Channel %d",
+                 prefix,
                  idx + 3,
                  (idx - MIDI_INSTRUMENTS_START_IDX) + 1);
     }
     else
     {
-#ifdef SHOW_EMPTY_SLOT_LABEL
-        if (mtProject.instrument[idx].isActive)
-        {
-#endif
-            snprintf(actualInstrName,
-                     SAMPLE_NAME_SIZE,
-                     "%d. %s",
-                     idx + 1,
-                     mtProject.instrument[idx].sample.file_name);
-#ifdef SHOW_EMPTY_SLOT_LABEL
-        }
-        else
-        {
-            snprintf(actualInstrName, SAMPLE_NAME_SIZE, "%d. Empty slot", idx + 1);
-        }
-#endif
+        snprintf(shownName,
+                 sizeof(shownName),
+                 "%s%d. %s",
+                 prefix,
+                 idx + 1,
+                 mtProject.instrument[idx].isActive ? mtProject.instrument[idx].sample.file_name
+                                                    : "Empty");
     }
 
-    display.setControlText(rightLabel, actualInstrName);
+    const uint32_t style = kRightLabelStyle; // read by FONT_INDEX_FROM_STYLE
+    const strFont* font = &fonts[FONT_INDEX_FROM_STYLE];
+    const uint16_t keep = lengthBeforeCut(font, shownName, kRightLabelWidth);
+    if (shownName[keep] != 0)
+    {
+        strcpy(&shownName[keep], kCutMarker); // keep < strlen, so "..." fits the buffer
+    }
+
+    display.setControlText(rightLabel, shownName);
     display.setControlShow(rightLabel);
     display.refreshControl(rightLabel);
 }

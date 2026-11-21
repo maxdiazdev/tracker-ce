@@ -38,6 +38,14 @@ extern cPatternEditor patternEditor;
 InterfacePopups mtPopups;
 static InterfacePopups* POP = &mtPopups;
 
+// The instrument picker shows sample instruments: pad n is sample slot n (not on MIDI tracks)
+static bool isSamplePicker()
+{
+    return POP->getStepPopupState() == stepPopupInstr &&
+           !(mtInterface.isPatternScreenActive() &&
+             patternEditor.isSelectionOrCursorInMidiTracks());
+}
+
 //=====================================================================================================
 //
 //=====================================================================================================
@@ -915,6 +923,12 @@ void InterfacePopups::lightUpPads()
     switch (stepPopupState)
     {
         case stepPopupInstr:
+            if (isSamplePicker())
+            {
+                cPatternEditor::lightUpFilledSamplePads();
+                break;
+            }
+            [[fallthrough]]; // MIDI tracks: as stock
         case stepPopupOnlyMidiInstr:
         case stepPopupOnlySynthAndMidiInstr:
         {
@@ -1172,10 +1186,18 @@ static void functNoteActionButton(uint8_t button, uint8_t state)
 //=========================================================================================================
 static void functPadsPopup(uint8_t pad, uint8_t state, int16_t)
 {
+    // Sample picker: pad n selects slot n. The synths are listed first, so the list position is
+    // shifted (pick the synths with the encoder).
+    int16_t popupValue = pad;
+#if GUI_HANDLE_SYNTH
+    if (isSamplePicker())
+        popupValue = pad + kSynthInstrumentsCount;
+#endif
+
     if (state == buttonPress)
     {
         padsBacklight.setFrontLayer(1, mtConfig.values.padsLightBack, pad);
-        mtPopups.setStepPopupValue(pad);
+        mtPopups.setStepPopupValue(popupValue);
 
         switch (POP->getStepPopupState())
         {
